@@ -31,9 +31,11 @@ app.get('/', async (req, res) => {
       uniqueDownloads: line[2],
       views: line[3]
     }
+    let logo = await fetch("https://images.nexusmods.com/favicons/ReskinOrange/favicon.svg")
     res.send({
       "schemaVersion": 1,
-      "label": "Nexus Downloads",
+      "logoSvg": await logo.text(),
+      "label": "Downloads",
       "message": data.totalDownloads,
       "color": "orange"
     })
