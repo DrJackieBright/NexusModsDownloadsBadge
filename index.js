@@ -1,29 +1,33 @@
 const express = require('express')
 const fetch = require('node-fetch')
 
-const apiURL = "https://staticstats.nexusmods.com/live_download_counts/mods/"
+const nexusApiUrl = "https://staticstats.nexusmods.com/live_download_counts/mods/"
 
 const app = express();
 
 app.get('/', async (req, res) => {
   let game = req.query.game
   let mod = req.query.mod
-  if (!game || !mod) {
-    res.status(400).send("<p>Bad Request: Missing game or mod id</p><p>Request should be in the format [domain]/?game=[game id]&mod=[mod id]</p>")
-    return
-  }
+
+  res.send({
+    "schemaVersion": 1,
+    "logoSvg": await (await fetch("https://images.nexusmods.com/favicons/ReskinOrange/favicon.svg")).text(),
+    "label": "Downloads",
+    "message": await getDownloadCount(game, mod),
+    "color": "orange"
+  })
+});
+
+async function getDownloadCount(game, mod) {
+  if (!game) return "Game ID not specified"
+  if (!mod) return "Mod ID not specified"
   try {
-    let resp = await fetch(`${apiURL}/${game}.csv`)
-    if (resp.status == 404) {
-      res.status(400).send("Bad Request: Game not found")
-      return
-    }
-    let body = await resp.text()
-    let match = body.match(new RegExp(`\\D${mod},\\d+,\\d+,\\d+`))
-    if (match == null) {
-      res.status(400).send("Bad Request: Mod not found")
-      return
-    }
+    let nexusCSV = await fetch(`${nexusApiUrl}/${game}.csv`)
+    if (nexusCSV.status == 404) return `Game "${game}" not found"`
+
+    let match = (await nexusCSV.text()).match(new RegExp(`\\D${mod},\\d+,\\d+,\\d+`))
+    if (match == null) return `Mod "${mod}" not found`
+
     let line = match[0].split(",")
     let data = {
       id: line[0],
@@ -31,20 +35,13 @@ app.get('/', async (req, res) => {
       uniqueDownloads: line[2],
       views: line[3]
     }
-    let logo = await fetch("https://images.nexusmods.com/favicons/ReskinOrange/favicon.svg")
-    res.send({
-      "schemaVersion": 1,
-      "logoSvg": await logo.text(),
-      "label": "Downloads",
-      "message": data.totalDownloads,
-      "color": "orange"
-    })
+    return data.totalDownloads
   } catch (err) {
     //console.log(req)
     console.error(err)
-    res.sendStatus(500)
+    return "Internal Error"
   }
-});
+}
 
 app.listen(process.env.PORT || 3000, () => {
   console.log('server started')
